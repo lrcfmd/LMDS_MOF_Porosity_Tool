@@ -4,7 +4,7 @@
 <html>
 
 <head>
-	<title>Predicting MOF Porosity with ML</title>
+	<title>MOF Porosity</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
 		integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -108,12 +108,13 @@ outline: none;
 
 <body>
 	{% include '/static/header.html' %}
-	<div class="mainView">
+	<div class="mainView container mainContainer">
 	<div class="container mt-5">
 		
 
 		<div class="form ">
-			<p class="title text-red">Predict MOF porosity from a metal and a linker</p>
+<!--			<p class="title text-red">Predict MOF porosity from a metal and a linker</p> -->
+			<img href="title" src="https://lmds.liverpool.ac.uk/static/images/Titles/mof_pore.svg">
 			<form action="" method="POST">
 				<div class="input-form">
 					{{ form.csrf_token }}
@@ -152,6 +153,11 @@ outline: none;
 
 		
 	</div>
+
+	<p id="explanationText">
+	Enter the formulation of a potential MOF using the SMILES representation of the linker and the metal(s) to be combined, to predict the likelihood of pores of different sizes forming in the resultant structure. This model was reported in <a href="">The Liverpool Materials Discovery Server: A suite of tools for the collaborative discovery of materials.</a> and is based on the model first reported in <a href="https://onlinelibrary.wiley.com/doi/full/10.1002/ange.202114573">Machine-Learning Prediction of Metal–Organic Framework Guest Accessibility from Linker and Metal Chemistry</a>. Please consider citing these papers if you use this in your work. 
+	</p>
+
 </div>
 	{% include '/static/footer.html' %}
 
