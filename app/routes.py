@@ -116,6 +116,10 @@ def do_predictions(linkers, metals):
     results = zip(linkers, metals, m1_preds, m2_preds, m3_preds, prediction_texts)
     return results
 
+@app.route("/API_info", methods=['GET', 'POST'])
+def api_info():
+    return render_template("api_info.html")
+
 #Define route
 @app.route("/", methods=['GET', 'POST'])
 @app.route("/predict", methods=['GET', 'POST'])
@@ -167,4 +171,4 @@ class ApiEndpoint(Resource):
     def post(self):
         args = parser.parse_args()
         return self.put()
-api.add_resource(ApiEndpoint, "/MOF_ML_API")
+api.add_resource(ApiEndpoint, "/API")
