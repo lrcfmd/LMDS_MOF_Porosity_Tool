@@ -8,7 +8,7 @@ from logging.config import dictConfig
 from rdkit import Chem
 from jinja2 import BaseLoader, TemplateNotFound,ChoiceLoader, FileSystemLoader
 from urllib import request, parse
-from flask import render_template
+from flask import render_template, jsonify, make_response
 from ElMD import ElMD
 from mordred import Calculator, descriptors
 from app import app, api
@@ -151,7 +151,7 @@ class ApiEndpoint(Resource):
     def put(self):
         args = parser.parse_args()
         if ("metal" not in args) or ("SMILES" not in args):
-            return {"Error":"Failed to process input, check both metal and SMILES are provided."}    
+            return make_response(jsonify({"Error":"Failed to process input, check both metal and SMILES are provided."}), 400)
         
         try:
             if isinstance(args["metal"],str):
@@ -163,12 +163,14 @@ class ApiEndpoint(Resource):
                 smiles = [args["SMILES"].strip()]
             else:
                 smiles = [x.strip() for x in args["SMILES"] if x.strip() != ""]
-            return list(map(str, do_predictions(smiles, metal)))
+            return jsonify({"MOF ML Results": list(map(str, do_predictions(smiles, metal)))})
+
         except Exception as e:
             app.logger.debug(e)
-            return {"Error":"Failed to process input, check it is properly formatted."}    
+            return make_response(jsonify({"Error":"Failed to process input, check it is properly formatted."}), 500)
     
     def post(self):
         args = parser.parse_args()
         return self.put()
+
 api.add_resource(ApiEndpoint, "/API")

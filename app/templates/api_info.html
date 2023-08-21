@@ -34,7 +34,7 @@
 	</div>
 
 	<p id="explanationText">
-	Access to the MOF Porosity prediction REST API is had through POST or PUT requests to <a>https://lmds.liverpool.ac.uk/mof_ml/API</a> with JSON fitting the following schema:</p>
+	Access to the MOF Porosity prediction REST API is prodivded by making POST or PUT requests to <a>https://lmds.liverpool.ac.uk/mof_ml/API</a> with JSON fitting the following schema:</p>
         <table class="table table-striped table-hover">
 				<tr>
 					<th>Argument</th>
@@ -49,7 +49,7 @@
 				<tr>
 					<td> metal </td>
 					<td> String or list of strings </td>
-					<td> The Elemntal symbol of the metal ligand(s) with which to make the prediction </td>
+					<td> The Elemental symbol of the metal ligand(s) with which to make the prediction </td>
 				</tr>
 			</table>
         <p id="explanationText">
@@ -73,30 +73,34 @@
 				<tr>
 					<td> 1 </td>
 					<td> String </td>
-					<td> The Elemntal symbol of the metal ligand with which the prediction was made.</td>
+					<td> The Elemental symbol of the metal ligand with which the prediction was made.</td>
 				</tr>
                 <tr>
 					<td> 2 </td>
 					<td> String ("True" or "False") </td>
-					<td> The prediction made by the first model in the ensemble, returns "True" of MOF is predicted to have pore limiting diameter larger than 2.4 &#8491 </td>
+					<td> The prediction made by the first model in the ensemble, returns "True" if MOF is predicted to have pore limiting diameter larger than 2.4 &#8491 </td>
 				</tr>
                 <tr>
 					<td> 3 </td>
 					<td> String ("True" or "False") </td>
-					<td> The prediction made by the second model in the ensemble, returns "True" of MOF is predicted to have pore limiting diameter larger than 4.4 &#8491 </td>
+					<td> The prediction made by the second model in the ensemble, returns "True" if MOF is predicted to have pore limiting diameter larger than 4.4 &#8491 </td>
 				</tr>
                 <tr>
 					<td> 4 </td>
 					<td> String ("True" or "False") </td>
-					<td> The prediction made by the third model in the ensemble, returns "True" of MOF is predicted to have pore limiting diameter larger than 5.9 &#8491 </td>
+					<td> The prediction made by the third model in the ensemble, returns "True" if MOF is predicted to have pore limiting diameter larger than 5.9 &#8491 </td>
 				</tr>
                 <tr>
 					<td> 5 </td>
 					<td> String </td>
-					<td> The overal classification made by the ensemble. </td>
+					<td> The overall classification made by the ensemble. </td>
 				</tr>
 			</table>
 <br/>
+
+<p> Example Usage </p>
+
+<code style="color:black"> $ curl -X PUT "https://lmds.liverpool.ac.uk/mof_ml/API" -H "Content-Type: application/json" -d '{"SMILES": "CCO", "metal": "Fe"}' </code>
 </div>
 </div>
 	{% include '/static/footer.html' %}
