@@ -1,0 +1,91 @@
+{
+  "$schema": "./model.schema.json",
+  "name": "mof-porosity",
+  "version": "1.0.0",
+
+  "parameters": {},
+
+  "execution": {
+    "modes": {
+      "instance": {
+        "description": "Predict the porosity category of one or more MOFs from linker SMILES and metal symbols, returned directly in the API response. Supports broadcasting: pass many linkers with one metal, one linker with many metals, or equal-length lists paired in order.",
+        "response": "immediate",
+        "inputs": {
+          "linkers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "required": true,
+            "description": "SMILES string(s) of the organic linker(s)"
+          },
+          "metals": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "required": true,
+            "description": "Elemental symbol(s) of the metal(s), e.g. Zn, Cu, Fe"
+          }
+        },
+        "outputs": {
+          "predictions": {
+            "type": "array",
+            "description": "One prediction per (linker, metal) pair after broadcasting",
+            "items": {
+              "type": "object",
+              "properties": {
+                "linker": {
+                  "type": "string",
+                  "description": "SMILES of the linker used for this prediction"
+                },
+                "metal": {
+                  "type": "string",
+                  "description": "Metal symbol used for this prediction"
+                },
+                "pld_gt_2_4A": {
+                  "type": "boolean",
+                  "description": "Model M1: pore limiting diameter predicted larger than 2.4 Å"
+                },
+                "pld_gt_4_4A": {
+                  "type": "boolean",
+                  "description": "Model M2: pore limiting diameter predicted larger than 4.4 Å"
+                },
+                "pld_gt_5_9A": {
+                  "type": "boolean",
+                  "description": "Model M3: pore limiting diameter predicted larger than 5.9 Å"
+                },
+                "category": {
+                  "type": "string",
+                  "description": "Overall porosity category from the ensemble"
+                }
+              }
+            }
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of predictions returned"
+          }
+        }
+      },
+
+      "dataset": {
+        "description": "Batch-predict MOF porosity from a CSV file of explicit linker,metal pairs (one MOF per row). Produces a downloadable CSV of predictions.",
+        "response": "deferred",
+        "inputs": {
+          "file": {
+            "type": "file",
+            "mime_type": "text/csv",
+            "required": true,
+            "description": "CSV with 'linker' and 'metal' columns, one MOF per row"
+          }
+        },
+        "outputs": {
+          "predictions.csv": {
+            "type": "file",
+            "mime_type": "text/csv",
+            "description": "Input rows augmented with per-model predictions and the overall porosity category"
+          }
+        }
+      }
+    }
+  }
+}
