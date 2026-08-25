@@ -17,5 +17,9 @@ WORKDIR /app
 COPY --from=builder /app/dist/*.whl /app/
 RUN pip install --no-cache-dir /app/*.whl
 
-RUN mkdir -p /data/output
+# Model artifacts are NOT baked into the image — they are provided at runtime.
+# The application reads them from MODEL_ARTIFACTS_DIR; mount the models there
+# (e.g. `-v /path/to/models:/models`). See src/model/artifacts/README.md.
+ENV MODEL_ARTIFACTS_DIR=/models
+RUN mkdir -p /data/output /models
 ENTRYPOINT ["model-run"]

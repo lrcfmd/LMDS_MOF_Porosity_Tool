@@ -227,3 +227,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Model artifacts ---
+# Large model files (ensemble models, scalers, descriptor table) are NOT
+# committed to git. They are provided to the application at runtime (see
+# src/model/artifacts/README.md). Only the placeholder + manifest are tracked.
+/src/model/artifacts/*
+!/src/model/artifacts/.gitkeep
+!/src/model/artifacts/README.md

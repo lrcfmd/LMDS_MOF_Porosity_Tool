@@ -1,4 +1,5 @@
 import csv
+import os
 from pathlib import Path
 
 import joblib
@@ -8,7 +9,27 @@ from rdkit import Chem
 
 from infrastructure.logging import newLogger
 
-ARTIFACTS = Path(__file__).resolve().parent / "artifacts"
+
+# Model artifacts are NOT committed to git; they are provided to the application
+# at runtime. Resolve their directory from MODEL_ARTIFACTS_DIR (set by the
+# deployment, e.g. a mounted volume), falling back to the package's own
+# artifacts/ dir for running from a source checkout. See artifacts/README.md.
+def _artifacts_dir() -> Path:
+    env = os.environ.get("MODEL_ARTIFACTS_DIR")
+    if env:
+        return Path(env)
+    return Path(__file__).resolve().parent / "artifacts"
+
+
+# Files that must be present in the artifacts directory at runtime.
+REQUIRED_ARTIFACTS = (
+    "elemental_descriptors.csv",
+    "scaler.joblib",
+    "metal_scaler.joblib",
+    "model_M1.joblib",
+    "model_M2.joblib",
+    "model_M3.joblib",
+)
 
 # The 50 mordred descriptors the linker models were trained on, in order.
 LINKER_DESCRIPTORS = [
@@ -50,17 +71,29 @@ class MOFPorosityModel:
         """Lazily load featurisers, scalers and models (heavy; done once)."""
         if self._loaded:
             return
-        self.logger.info("loading artifacts", dir=str(ARTIFACTS))
+        artifacts = _artifacts_dir()
+        self.logger.info("loading artifacts", dir=str(artifacts))
+
+        missing = [f for f in REQUIRED_ARTIFACTS if not (artifacts / f).is_file()]
+        if missing:
+            raise FileNotFoundError(
+                f"Model artifacts missing from {artifacts}: {', '.join(missing)}. "
+                "These files are provided to the application at runtime and are "
+                "not committed to git — see src/model/artifacts/README.md. Set "
+                "MODEL_ARTIFACTS_DIR to the directory that holds them, or mount "
+                "them into the default location."
+            )
+
         self.calc = Calculator(mordred_descriptors, ignore_3D=True)
         self.elements = (
-            pd.read_csv(ARTIFACTS / "elemental_descriptors.csv", index_col="Symbol")
+            pd.read_csv(artifacts / "elemental_descriptors.csv", index_col="Symbol")
             .drop("Name", axis=1)
         )
-        self.scaler = joblib.load(ARTIFACTS / "scaler.joblib")
-        self.metal_scaler = joblib.load(ARTIFACTS / "metal_scaler.joblib")
-        self.m1 = joblib.load(ARTIFACTS / "model_M1.joblib")
-        self.m2 = joblib.load(ARTIFACTS / "model_M2.joblib")
-        self.m3 = joblib.load(ARTIFACTS / "model_M3.joblib")
+        self.scaler = joblib.load(artifacts / "scaler.joblib")
+        self.metal_scaler = joblib.load(artifacts / "metal_scaler.joblib")
+        self.m1 = joblib.load(artifacts / "model_M1.joblib")
+        self.m2 = joblib.load(artifacts / "model_M2.joblib")
+        self.m3 = joblib.load(artifacts / "model_M3.joblib")
         self._loaded = True
 
     @staticmethod

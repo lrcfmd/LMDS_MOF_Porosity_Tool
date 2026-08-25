@@ -37,11 +37,13 @@ validate-model = "cmds.validate_model:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# Model artifacts (scalers, descriptor table, ensemble models) live under
-# src/model/artifacts and are swept into the wheel with the package, so the
-# container can load them at runtime.
+# Model artifacts are NOT bundled in the wheel or image — they are provided to
+# the application at runtime (see src/model/artifacts/README.md). Exclude them
+# explicitly: the Docker build context has no .git, so VCS-ignore alone would
+# not keep the locally-present files out of the wheel.
 [tool.hatch.build.targets.wheel]
 packages = ["src/cmds", "src/infrastructure", "src/model"]
+exclude = ["src/model/artifacts/*"]
 
 [tool.uv]
 package = true

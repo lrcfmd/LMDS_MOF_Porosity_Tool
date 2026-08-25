@@ -64,7 +64,8 @@ Only some elements are supported as the metal — see
 │       ├── __init__.py         # handler = MOFPorosityModel()
 │       ├── model.py            # Prediction logic (descriptors, scaling, ensemble)
 │       ├── types.py            # Auto-generated from model.json
-│       └── artifacts/          # Scalers, descriptor table, and the 3 models
+│       └── artifacts/          # Model files — provided at runtime, NOT in git
+│                               #   (only .gitkeep + README.md tracked)
 ├── data/                       # Local sample inputs + run outputs (output/ ignored)
 ├── scripts/                    # run_instance.sh, run_dataset.sh
 ├── tests/test_model.py
@@ -91,6 +92,23 @@ version and drop the pins.
 `rdkit` and `mordredcommunity` (a maintained fork of the original, unmaintained
 `mordred`) supply the linker descriptors.
 
+## Model artifacts (provided at runtime)
+
+The ~90 MB of model files (the three ensemble classifiers, the two scalers and
+the elemental descriptor table) are **not committed to git**. They are provided
+to the application at runtime; the repo tracks only a placeholder and a manifest
+at [`src/model/artifacts/`](src/model/artifacts/README.md).
+
+The model resolves the artifact directory from the `MODEL_ARTIFACTS_DIR`
+environment variable, falling back to `src/model/artifacts/` when unset. If any
+required file is missing it fails immediately with a message listing them.
+
+- **Local development:** put the files directly in `src/model/artifacts/`
+  (the default location); everything then runs as normal.
+- **Container / deployment:** the image does **not** bundle the files. Mount them
+  at runtime — the image defaults `MODEL_ARTIFACTS_DIR=/models`, so
+  `-v /path/to/models:/models` is enough (or set the env var to another path).
+
 ## Local development
 
 ```bash
@@ -111,7 +129,11 @@ uv run model-run --local --parameters '{"mode":"instance","inputs":{"linkers":{"
 ```bash
 # 3.11 is the default build arg; the model requires it.
 docker build -t mof-porosity:1.0.0 .
-docker run --rm mof-porosity:1.0.0 --local \
+
+# Model artifacts are provided at runtime — mount them at /models (the image's
+# default MODEL_ARTIFACTS_DIR). Without them the container exits with a message
+# listing the missing files.
+docker run --rm -v /path/to/models:/models mof-porosity:1.0.0 --local \
   --parameters '{"mode":"instance","inputs":{"linkers":{"value":["CCO"]},"metals":{"value":["Fe"]}},"parameters":{}}'
 ```
 
