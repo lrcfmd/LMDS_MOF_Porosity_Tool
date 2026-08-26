@@ -18,9 +18,10 @@ WORKDIR /app
 COPY --from=builder /app/dist/*.whl /app/
 RUN pip install --no-cache-dir /app/*.whl && rm -f /app/*.whl
 
-# The platform runs the container as uid 1000 and the runner downloads runtime
-# assets to ./artifacts under WORKDIR, so /app (and /data/output, /home/lmds)
-# must be writable by that user.
-RUN mkdir -p /data/output && chown -R 1000:1000 /app /data/output /home/lmds
+# The platform runs the container as uid 1000. The runner downloads runtime
+# assets to ./artifacts under WORKDIR, and creates /data/input (file inputs) and
+# /data/output (results), so /app and all of /data (and /home/lmds) must be
+# writable by that user.
+RUN mkdir -p /data/input /data/output && chown -R 1000:1000 /app /data /home/lmds
 USER 1000:1000
 ENTRYPOINT ["model-run"]
