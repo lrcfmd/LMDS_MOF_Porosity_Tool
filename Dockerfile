@@ -13,12 +13,14 @@ RUN uv build --wheel
 
 # Stage 2: Minimal runtime image
 FROM python:${PYTHON_VERSION}-slim
+RUN groupadd -r lmds && useradd -r -g lmds -u 1000 -m -d /home/lmds lmds
 WORKDIR /app
 COPY --from=builder /app/dist/*.whl /app/
-RUN pip install --no-cache-dir /app/*.whl
+RUN pip install --no-cache-dir /app/*.whl && rm -f /app/*.whl
 
-# Model artifacts are NOT baked into the image — they are declared as `assets`
-# in schema/model.json and downloaded at run time by the runner to their paths
-# under the WORKDIR (./artifacts/…). See src/model/artifacts/README.md.
-RUN mkdir -p /data/output
+# The platform runs the container as uid 1000 and the runner downloads runtime
+# assets to ./artifacts under WORKDIR, so /app (and /data/output, /home/lmds)
+# must be writable by that user.
+RUN mkdir -p /data/output && chown -R 1000:1000 /app /data/output /home/lmds
+USER 1000:1000
 ENTRYPOINT ["model-run"]
