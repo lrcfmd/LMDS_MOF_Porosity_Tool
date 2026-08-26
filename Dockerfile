@@ -3,20 +3,24 @@
 # which has no cp312 wheels. See pyproject.toml for the full rationale.
 ARG PYTHON_VERSION=3.11
 
-# Stage 1: Build wheel using uv
+# Stage 1: build the locked environment with uv
 FROM python:${PYTHON_VERSION}-slim AS builder
-WORKDIR /app
 RUN pip install --no-cache-dir uv
+WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
-RUN uv build --wheel
+# Install the exact locked dependency set from uv.lock (not a fresh resolve) plus
+# the project itself, into /app/.venv. --frozen guarantees the runtime stack is
+# byte-for-byte what was tested/locked — important for the version-sensitive
+# scikit-learn 1.2.0 pickles.
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-editable
 
-# Stage 2: Minimal runtime image
+# Stage 2: minimal runtime image (same base, so native libs match)
 FROM python:${PYTHON_VERSION}-slim
 RUN groupadd -r lmds && useradd -r -g lmds -u 1000 -m -d /home/lmds lmds
 WORKDIR /app
-COPY --from=builder /app/dist/*.whl /app/
-RUN pip install --no-cache-dir /app/*.whl && rm -f /app/*.whl
+COPY --from=builder --chown=1000:1000 /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # The platform runs the container as uid 1000. The runner downloads runtime
 # assets to ./artifacts under WORKDIR, and creates /data/input (file inputs) and
