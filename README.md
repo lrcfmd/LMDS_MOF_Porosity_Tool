@@ -92,22 +92,25 @@ version and drop the pins.
 `rdkit` and `mordredcommunity` (a maintained fork of the original, unmaintained
 `mordred`) supply the linker descriptors.
 
-## Model artifacts (provided at runtime)
+## Model artifacts (runtime assets)
 
 The ~90 MB of model files (the three ensemble classifiers, the two scalers and
-the elemental descriptor table) are **not committed to git**. They are provided
-to the application at runtime; the repo tracks only a placeholder and a manifest
-at [`src/model/artifacts/`](src/model/artifacts/README.md).
+the elemental descriptor table) are **not committed to git** and **not baked
+into the image**. They are declared as `assets` in `schema/model.json` and
+provided by the LMDS platform at run time:
 
-The model resolves the artifact directory from the `MODEL_ARTIFACTS_DIR`
-environment variable, falling back to `src/model/artifacts/` when unset. If any
-required file is missing it fails immediately with a message listing them.
+1. An admin uploads a file for each declared asset path under the version's
+   **Manage → Versions → Assets** page (only schema-declared paths are accepted).
+2. On each run, the runner downloads the assets from S3 to their declared paths
+   under the container WORKDIR (`./artifacts/…`) before the handler executes.
 
-- **Local development:** put the files directly in `src/model/artifacts/`
-  (the default location); everything then runs as normal.
-- **Container / deployment:** the image does **not** bundle the files. Mount them
-  at runtime — the image defaults `MODEL_ARTIFACTS_DIR=/models`, so
-  `-v /path/to/models:/models` is enough (or set the env var to another path).
+The model reads them from `./artifacts/` (the package's `artifacts/` dir is the
+fallback for a local source checkout; `MODEL_ARTIFACTS_DIR` overrides both), and
+fails fast with a clear message if any required file is missing. See
+[`src/model/artifacts/README.md`](src/model/artifacts/README.md) for the manifest.
+
+**Local development:** put the files in `src/model/artifacts/`; everything runs
+as normal.
 
 ## Local development
 
@@ -130,10 +133,10 @@ uv run model-run --local --parameters '{"mode":"instance","inputs":{"linkers":{"
 # 3.11 is the default build arg; the model requires it.
 docker build -t mof-porosity:1.0.0 .
 
-# Model artifacts are provided at runtime — mount them at /models (the image's
-# default MODEL_ARTIFACTS_DIR). Without them the container exits with a message
-# listing the missing files.
-docker run --rm -v /path/to/models:/models mof-porosity:1.0.0 --local \
+# On the platform the runner downloads the declared assets to ./artifacts before
+# running. To run the image by hand, put the model files where the runner would
+# — mount them at /app/artifacts — and the model reads them from there:
+docker run --rm -v /path/to/artifacts:/app/artifacts:ro mof-porosity:1.0.0 --local \
   --parameters '{"mode":"instance","inputs":{"linkers":{"value":["CCO"]},"metals":{"value":["Fe"]}},"parameters":{}}'
 ```
 

@@ -3,6 +3,45 @@
   "name": "mof-porosity",
   "version": "1.0.0",
 
+  "assets": {
+    "artifacts/model_M1.joblib": {
+      "type": "file",
+      "mime_type": "application/octet-stream",
+      "required": true,
+      "description": "Ensemble classifier M1 (pore limiting diameter > 2.4 Å)"
+    },
+    "artifacts/model_M2.joblib": {
+      "type": "file",
+      "mime_type": "application/octet-stream",
+      "required": true,
+      "description": "Ensemble classifier M2 (pore limiting diameter > 4.4 Å)"
+    },
+    "artifacts/model_M3.joblib": {
+      "type": "file",
+      "mime_type": "application/octet-stream",
+      "required": true,
+      "description": "Ensemble classifier M3 (pore limiting diameter > 5.9 Å)"
+    },
+    "artifacts/scaler.joblib": {
+      "type": "file",
+      "mime_type": "application/octet-stream",
+      "required": true,
+      "description": "Scaler for the mordred linker descriptors"
+    },
+    "artifacts/metal_scaler.joblib": {
+      "type": "file",
+      "mime_type": "application/octet-stream",
+      "required": true,
+      "description": "Scaler for the metal descriptors"
+    },
+    "artifacts/elemental_descriptors.csv": {
+      "type": "file",
+      "mime_type": "text/csv",
+      "required": true,
+      "description": "Elemental descriptor table, indexed by element Symbol"
+    }
+  },
+
   "parameters": {},
 
   "execution": {
