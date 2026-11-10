@@ -13,7 +13,9 @@ COPY src/ ./src/
 # the project itself, into /app/.venv. --frozen guarantees the runtime stack is
 # byte-for-byte what was tested/locked — important for the version-sensitive
 # scikit-learn 1.2.0 pickles.
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-editable
+# --compile-bytecode: ship .pyc files, so each run (a fresh container, as
+# uid 1000 that cannot write them back) does not recompile every import.
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-editable --compile-bytecode
 
 # Stage 2: minimal runtime image (same base, so native libs match)
 FROM python:${PYTHON_VERSION}-slim
