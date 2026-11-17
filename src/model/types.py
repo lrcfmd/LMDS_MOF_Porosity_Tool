@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import TypedDict, Literal
 
 class InstanceInputs(TypedDict, total=False):
-    # SMILES string(s) of the organic linker(s)
+    # SMILES string(s) of the organic linker(s), e.g. O=C(O)c1ccc(cc1)C(=O)O
     linkers: list[str]
-    # Elemental symbol(s) of the metal(s), e.g. Zn, Cu, Fe
+    # Metal element symbol(s), e.g. Zn, Cu, Fe (one for all linkers, or one per linker in order)
     metals: list[str]
 
 class DatasetInputs(TypedDict, total=False):
-    # CSV with 'linker' and 'metal' columns, one MOF per row
+    # CSV of MOFs, one per row: the linker SMILES and the metal's element symbol
     file: tuple[Path, str]

@@ -7,6 +7,7 @@ import pandas as pd
 from mordred import Calculator, descriptors as mordred_descriptors
 from rdkit import Chem
 
+from infrastructure.handler import InputError
 from infrastructure.logging import newLogger
 
 
@@ -54,6 +55,82 @@ METAL_DESCRIPTORS = [
     "polarizability(A^3)", "electron affinity(kJ/mol)",
 ]
 
+# Most items listed in one error message.
+_MAX_LISTED = 5
+
+
+def _listing(items: list[str]) -> str:
+    shown = "; ".join(items[:_MAX_LISTED])
+    if len(items) > _MAX_LISTED:
+        shown += f"; and {len(items) - _MAX_LISTED} more"
+    return shown
+
+
+def smiles_problem(smiles: str) -> str | None:
+    """Why ``smiles`` can't be used as a linker, or None if it parses."""
+    if Chem.MolFromSmiles(smiles) is not None:
+        return None
+    if Chem.MolFromSmiles(smiles, sanitize=False) is not None:
+        return "chemically invalid, e.g. an atom with too many bonds or an aromatic ring that cannot be kekulised"
+    return "not valid SMILES syntax"
+
+
+def read_pairs_csv(path: Path) -> list[tuple[int, str, str]]:
+    """Read a ``linker,metal`` CSV into ``(row number, linker, metal)`` tuples.
+
+    Row numbers count the header as row 1 (as a spreadsheet shows them). Fully
+    blank rows are skipped; anything else unusable raises InputError.
+    """
+    try:
+        # utf-8-sig: tolerate the byte-order mark Excel writes.
+        with path.open(newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            fieldnames = [(n or "").strip() for n in (reader.fieldnames or [])]
+            if not any(fieldnames):
+                raise InputError(
+                    "The CSV file is empty. It needs a header row 'linker,metal' "
+                    "followed by one row per MOF."
+                )
+            missing = [c for c in ("linker", "metal") if c not in fieldnames]
+            if missing:
+                raise InputError(
+                    "The CSV must have 'linker' and 'metal' columns (comma-"
+                    f"separated, named in the first row); missing: "
+                    f"{', '.join(repr(c) for c in missing)}. Found columns: "
+                    f"{', '.join(repr(c) for c in fieldnames)}."
+                )
+            reader.fieldnames = fieldnames
+            rows, half_filled = [], []
+            for row in reader:
+                line = reader.line_num
+                linker = (row.get("linker") or "").strip()
+                metal = (row.get("metal") or "").strip()
+                if not linker and not metal:
+                    continue  # blank row
+                if not linker or not metal:
+                    empty = "linker" if not linker else "metal"
+                    half_filled.append(f"row {line} has no {empty}")
+                    continue
+                rows.append((line, linker, metal))
+    except UnicodeDecodeError:
+        raise InputError(
+            "The CSV file could not be read as text. Please save it as a "
+            "UTF-8 CSV file."
+        ) from None
+    except csv.Error as e:
+        raise InputError(f"The CSV file could not be parsed ({e}).") from None
+
+    if half_filled:
+        raise InputError(
+            f"Every row needs both a linker and a metal: {_listing(half_filled)}."
+        )
+    if not rows:
+        raise InputError(
+            "No linker/metal rows found in input file: the CSV has a header "
+            "but no data rows."
+        )
+    return rows
+
 
 class MOFPorosityModel:
     """Predict metal-organic framework (MOF) porosity from linker + metal chemistry.
@@ -71,6 +148,63 @@ class MOFPorosityModel:
     def __init__(self):
         self.logger = newLogger("model")
         self._loaded = False
+        self.elements = None
+
+    def _elements(self) -> pd.DataFrame:
+        """The elemental descriptor table (small; loaded on its own so metals
+        can be checked before the heavy models are loaded)."""
+        if getattr(self, "elements", None) is None:
+            path = _artifacts_dir() / "elemental_descriptors.csv"
+            if not path.is_file():
+                self._load()  # raises the missing-artifacts error
+            self.elements = (
+                pd.read_csv(path, index_col="Symbol").drop("Name", axis=1)
+            )
+        return self.elements
+
+    def supported_metals(self) -> list[str]:
+        """Element symbols with a complete set of metal descriptors."""
+        table = self._elements()
+        complete = table[METAL_DESCRIPTORS].notna().all(axis=1)
+        return [str(s) for s in table.index[complete]]
+
+    def check_inputs(
+        self, linkers: list[str], metals: list[str],
+        linker_labels: list[str] | None = None,
+        metal_labels: list[str] | None = None,
+    ) -> None:
+        """Raise InputError if any linker SMILES or metal symbol is unusable.
+
+        ``*_labels`` say where each value came from in the message (e.g.
+        "row 3"); they default to "linker 1", "metal 2", ...
+        """
+        linker_labels = linker_labels or [f"linker {i + 1}" for i in range(len(linkers))]
+        metal_labels = metal_labels or [f"metal {i + 1}" for i in range(len(metals))]
+
+        bad_smiles = []
+        for label, smi in zip(linker_labels, linkers):
+            problem = smiles_problem(smi)
+            if problem:
+                bad_smiles.append(f"{label} {smi!r} is {problem}")
+        if bad_smiles:
+            raise InputError(f"Invalid SMILES for the linker: {_listing(bad_smiles)}.")
+
+        table = self._elements()
+        supported = set(self.supported_metals())
+        lookup = {s.lower(): s for s in supported}
+        bad_metals = []
+        for label, metal in zip(metal_labels, metals):
+            if metal in supported:
+                continue
+            if metal in table.index:
+                why = "has no descriptor data in the model, so it cannot be used"
+            elif metal.lower() in lookup:
+                why = f"is not a valid element symbol (did you mean {lookup[metal.lower()]!r}?)"
+            else:
+                why = "is not a recognised element symbol (give the symbol only, e.g. Zn, with no charge or name)"
+            bad_metals.append(f"{label} {metal!r} {why}")
+        if bad_metals:
+            raise InputError(f"Unknown metal: {_listing(bad_metals)}.")
 
     def _load(self) -> None:
         """Lazily load featurisers, scalers and models (heavy; done once)."""
@@ -90,10 +224,7 @@ class MOFPorosityModel:
             )
 
         self.calc = Calculator(mordred_descriptors, ignore_3D=True)
-        self.elements = (
-            pd.read_csv(artifacts / "elemental_descriptors.csv", index_col="Symbol")
-            .drop("Name", axis=1)
-        )
+        self._elements()
         self.scaler = joblib.load(artifacts / "scaler.joblib")
         self.metal_scaler = joblib.load(artifacts / "metal_scaler.joblib")
         self.m1 = joblib.load(artifacts / "model_M1.joblib")
@@ -113,13 +244,28 @@ class MOFPorosityModel:
         else:
             return "porosity > 5.9 Å"
 
-    def predict(self, linkers: list[str], metals: list[str]) -> list[dict]:
+    def predict(
+        self, linkers: list[str], metals: list[str], checked: bool = False
+    ) -> list[dict]:
         """Core prediction path shared by both Modes.
 
         Broadcasting mirrors the original tool: a single metal is applied to all
         linkers, a single linker is applied to all metals, otherwise the two
         lists are paired in order (and must be equal length).
+
+        Inputs are checked (InputError) before the models are loaded; pass
+        ``checked=True`` if :meth:`check_inputs` has already been run.
         """
+        if not linkers or not metals:
+            raise InputError("Both 'linkers' and 'metals' must be provided.")
+        if len(metals) != 1 and len(linkers) != 1 and len(linkers) != len(metals):
+            raise InputError(
+                "Linkers and metals must be the same length (they are paired in "
+                "order), or one of them a single value used with all of the "
+                f"others; you gave {len(linkers)} linkers and {len(metals)} metals."
+            )
+        if not checked:
+            self.check_inputs(linkers, metals)
         self._load()
 
         # Load and scale metal descriptors.
@@ -135,8 +281,8 @@ class MOFPorosityModel:
         results = []
         for linker in linkers:
             mol = Chem.MolFromSmiles(linker)
-            if mol is None:
-                raise ValueError(f"Invalid SMILES: {linker!r}")
+            if mol is None:  # unreachable after check_inputs
+                raise InputError(f"Invalid SMILES for the linker: {linker!r}.")
             results.append(self.calc(mol).asdict())
         results = pd.DataFrame(results)
         scaled_linker_descriptors = pd.DataFrame(
@@ -158,6 +304,7 @@ class MOFPorosityModel:
             )
             scaled_linker_descriptors.index = metal_descriptors.index
         elif len(scaled_linker_descriptors) != len(metal_descriptors):
+            # unreachable: lengths are checked above
             raise ValueError(
                 "linkers and metals must be the same length, or one must be "
                 f"a single value (got {len(linkers)} linkers, {len(metals)} metals)"
@@ -203,12 +350,15 @@ class MOFPorosityModel:
 
     def _process_instance(self, values: dict, logger) -> dict:
         """Instance Mode: linker/metal values -> predictions returned inline."""
-        linkers = [s.strip() for s in values.get("linkers", []) if str(s).strip()]
-        metals = [m.strip() for m in values.get("metals", []) if str(m).strip()]
+        linkers = [str(s).strip() for s in values.get("linkers") or [] if str(s).strip()]
+        metals = [str(m).strip() for m in values.get("metals") or [] if str(m).strip()]
 
         if not linkers or not metals:
             logger.warning("missing linkers or metals")
-            raise ValueError("Both 'linkers' and 'metals' must be provided")
+            raise InputError(
+                "Both 'linkers' and 'metals' must be provided: give at least one "
+                "linker SMILES and one metal symbol."
+            )
 
         predictions = self.predict(linkers, metals)
         logger.info("computed predictions", count=len(predictions))
@@ -220,28 +370,16 @@ class MOFPorosityModel:
         """Dataset Mode: CSV of linker,metal pairs -> predictions.csv asset."""
         if "file" not in files:
             logger.error("no input file provided")
-            raise ValueError("No input file provided")
+            raise InputError("No input file provided. Please upload a CSV file.")
 
         file_path, _ = files["file"]
-        linkers, metals = [], []
-        with file_path.open(newline="") as f:
-            reader = csv.DictReader(f)
-            if reader.fieldnames is None or not {"linker", "metal"} <= set(
-                name.strip() for name in reader.fieldnames
-            ):
-                raise ValueError("CSV must have 'linker' and 'metal' columns")
-            # Normalise header whitespace, then read rows.
-            for row in reader:
-                clean = {k.strip(): (v or "").strip() for k, v in row.items()}
-                if clean.get("linker") and clean.get("metal"):
-                    linkers.append(clean["linker"])
-                    metals.append(clean["metal"])
+        rows = read_pairs_csv(file_path)
+        labels = [f"row {line}" for line, _, _ in rows]
+        linkers = [linker for _, linker, _ in rows]
+        metals = [metal for _, _, metal in rows]
+        self.check_inputs(linkers, metals, labels, labels)
 
-        if not linkers:
-            logger.error("no rows found in input file")
-            raise ValueError("No linker/metal rows found in input file")
-
-        predictions = self.predict(linkers, metals)
+        predictions = self.predict(linkers, metals, checked=True)
         logger.info("computed predictions from file", rows=len(predictions))
 
         output_dir.mkdir(parents=True, exist_ok=True)

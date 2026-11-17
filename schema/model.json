@@ -55,14 +55,14 @@
             "items": { "type": "string" },
             "minItems": 1,
             "required": true,
-            "description": "SMILES string(s) of the organic linker(s)"
+            "description": "SMILES string(s) of the organic linker(s), e.g. O=C(O)c1ccc(cc1)C(=O)O"
           },
           "metals": {
             "type": "array",
             "items": { "type": "string" },
             "minItems": 1,
             "required": true,
-            "description": "Elemental symbol(s) of the metal(s), e.g. Zn, Cu, Fe"
+            "description": "Metal element symbol(s), e.g. Zn, Cu, Fe (one for all linkers, or one per linker in order)"
           }
         },
         "outputs": {
@@ -114,7 +114,21 @@
             "type": "file",
             "mime_type": "text/csv",
             "required": true,
-            "description": "CSV with 'linker' and 'metal' columns, one MOF per row"
+            "description": "CSV of MOFs, one per row: the linker SMILES and the metal's element symbol",
+            "header": true,
+            "columns": [
+              {
+                "name": "linker",
+                "description": "SMILES string of the organic linker, e.g. O=C(O)c1ccc(cc1)C(=O)O",
+                "type": "string"
+              },
+              {
+                "name": "metal",
+                "description": "Element symbol of the metal, e.g. Zn",
+                "type": "string"
+              }
+            ],
+            "example": "linker,metal\nO=C(O)c1ccc(cc1)C(=O)O,Zn\nO=C(O)c1ccc(cc1)C(=O)O,Cu\nc1cc(cc(c1)C(=O)O)C(=O)O,Fe\nO=C(O)c1cccc(c1)C(=O)O,Al\nCc1cc(cc(c1)C(=O)O)C(=O)O,Zr\n"
           }
         },
         "outputs": {
